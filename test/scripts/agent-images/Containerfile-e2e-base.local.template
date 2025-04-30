@@ -41,3 +41,5 @@ RUN useradd -ms /bin/bash user && \
 ## Add your flightctl configuration and certificates
 ADD bin/agent/etc/flightctl/config.yaml /etc/flightctl/
 ADD bin/agent/etc/flightctl/certs/* /etc/flightctl/certs/
+COPY test/scripts/agent-images/personalKey /usr/lib/flightctl/custom-info.d/personalKey
+COPY test/scripts/agent-images/personalKey2 /usr/lib/flightctl/custom-info.d/personalKey2
