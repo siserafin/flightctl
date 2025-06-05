@@ -207,7 +207,7 @@ function is_acm_installed() {
 # Function to get the ocp nodes network name
 function get_ocp_nodes_network() {
   local vm_name
-  vm_name=$(sudo virsh list --name | grep 'master-0')
+  vm_name=$(sudo virsh list --name | grep 'master-0' | head -n 1)
   [ -z "$vm_name" ] && return 1
 
   local network_name
