@@ -17,33 +17,55 @@ FILTER_SUBSTRINGS = [
     "[DeferCleanup (Container)]",
 ]
 
-def filter_junit_xml(input_path, output_path, filter_strings):
+# Suites to fully remove based on <testsuite name> or <testcase classname>
+FILTER_SUITES = [
+    "Label Selectors E2E Suite",
+    "Field selectors E2E Suite",
+    "Basic Operations E2E Suite",
+    "Basic Operations",
+    "Field Selectors Extension",        # covers partial classname matches like "Field Selectors E2E Suite"
+    "Label Selectors",        # in case the classname contains it
+]
+
+def filter_junit_xml(input_path, output_path, filter_strings, suite_name_fragments):
     try:
         tree = ET.parse(input_path)
         root = tree.getroot()
 
         filtered_testcases_count = 0
+        removed_suites_count = 0
 
-        # Iterate through all <testsuite> elements
-        for testsuite in root.findall('.//testsuite'):
+        # Remove entire test suites by name match
+        suites_to_remove = []
+        for testsuite in root.findall('testsuite'):
+            suite_name = testsuite.get('name', '')
+            if any(keyword in suite_name for keyword in suite_name_fragments):
+                suites_to_remove.append(testsuite)
+
+        for suite in suites_to_remove:
+            root.remove(suite)
+            removed_suites_count += 1
+
+        # Remove test cases based on name substrings or classname matches
+        for testsuite in root.findall('testsuite'):
             testcases_to_remove = []
             for testcase in testsuite.findall('testcase'):
-                testcase_name = testcase.get('name', '')
-                if any(f_str in testcase_name for f_str in filter_strings):
+                name = testcase.get('name', '')
+                classname = testcase.get('classname', '')
+                if (any(substr in name for substr in filter_strings) or
+                    any(sn in classname for sn in suite_name_fragments)):
                     testcases_to_remove.append(testcase)
                     filtered_testcases_count += 1
-
-            # Remove identified test cases
             for tc in testcases_to_remove:
                 testsuite.remove(tc)
 
-            # Update tests count in the <testsuite> tag
+            # Adjust the test count in the suite
             current_tests = int(testsuite.get('tests', '0'))
             testsuite.set('tests', str(current_tests - len(testcases_to_remove)))
 
-        # Write to output file
         tree.write(output_path, encoding='utf-8', xml_declaration=True)
         print(f"✅ Filtered {filtered_testcases_count} test case(s).")
+        print(f"🗑️ Removed {removed_suites_count} entire test suite(s).")
         print(f"📄 Filtered JUnit XML saved to: {output_path}")
 
     except FileNotFoundError:
@@ -54,7 +76,7 @@ def filter_junit_xml(input_path, output_path, filter_strings):
         print(f"❌ Unexpected error: {e}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Filter unwanted test cases from a JUnit XML file.")
+    parser = argparse.ArgumentParser(description="Filter unwanted test cases and test suites from a JUnit XML file.")
     parser.add_argument(
         "--input-file",
         default=DEFAULT_INPUT,
@@ -67,4 +89,8 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    filter_junit_xml(args.input_file, args.output_file, FILTER_SUBSTRINGS)
+    filter_junit_xml(args.input_file, args.output_file, FILTER_SUBSTRINGS, FILTER_SUITES)
+
+
+
+
