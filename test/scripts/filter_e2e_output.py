@@ -15,7 +15,7 @@ FILTER_NAME_SUBSTRINGS = [
     "[AfterSuite]",
     "[DeferCleanup (Suite)]",
     "[DeferCleanup (Container)]",
-    "Field Selector Extension",
+    "Field Selectors Extension",
     "Label Selectors",
     "Basic Operations",
 ]
