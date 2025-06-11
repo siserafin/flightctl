@@ -26,6 +26,7 @@ def filter_junit_xml(input_path, output_path, name_substrings):
         root = tree.getroot()
 
         filtered_testcases_count = 0
+        removed_testcase_names = []
 
         for testsuite in root.findall('testsuite'):
             testcases_to_remove = []
@@ -33,6 +34,7 @@ def filter_junit_xml(input_path, output_path, name_substrings):
                 name = testcase.get('name', '')
                 if any(keyword in name for keyword in name_substrings):
                     testcases_to_remove.append(testcase)
+                    removed_testcase_names.append(name)
 
             for testcase in testcases_to_remove:
                 testsuite.remove(testcase)
@@ -44,7 +46,12 @@ def filter_junit_xml(input_path, output_path, name_substrings):
 
         # Write the filtered tree to output
         tree.write(output_path, encoding='utf-8', xml_declaration=True)
+
         print(f"✅ Removed {filtered_testcases_count} test case(s) by name match.")
+        if removed_testcase_names:
+            print("🗑️ Removed test cases:")
+            for name in removed_testcase_names:
+                print(f"  - {name}")
         print(f"📄 Output saved to: {output_path}")
 
     except FileNotFoundError:
