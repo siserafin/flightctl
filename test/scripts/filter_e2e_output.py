@@ -11,14 +11,13 @@ DEFAULT_OUTPUT = DEFAULT_INPUT
 
 # Substrings to filter from <testcase name>
 FILTER_NAME_SUBSTRINGS = [
-    "Label Selectors",
-    "Field Selectors Extension",
-    "Field Selectors Operators"
-    "Basic Operations",
     "[BeforeSuite]",
     "[AfterSuite]",
     "[DeferCleanup (Suite)]",
     "[DeferCleanup (Container)]",
+    "Field Selector Extension",
+    "Label Selectors",
+    "Basic Operations",
 ]
 
 def filter_junit_xml(input_path, output_path, name_substrings):

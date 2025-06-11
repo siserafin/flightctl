@@ -16,11 +16,11 @@ var (
 
 func TestFieldSelector(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Field selectors E2E Suite")
+	RunSpecs(t, "Field selectors Extension E2E Suite")
 }
 
 var _ = BeforeSuite(func() {
-	suiteCtx = testutil.InitSuiteTracerForGinkgo("Field Selectors E2E Suite")
+	suiteCtx = testutil.InitSuiteTracerForGinkgo("Field Selectors Extension E2E Suite")
 })
 
 const (

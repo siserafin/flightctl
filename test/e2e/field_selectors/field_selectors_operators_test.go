@@ -9,7 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Field Selectors Operators", Label("sanity", "82198"), func() {
+var _ = Describe("Field Selectors Extension Operators", Label("integration", "82198"), func() {
 	var (
 		harness              *e2e.Harness
 		expectedDevices      []*api.Device
