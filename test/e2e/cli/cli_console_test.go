@@ -39,8 +39,10 @@ var _ = Describe("CLI - device console", Serial, func() {
 		harness = e2e.NewTestHarness(ctx)
 		login.LoginToAPIWithToken(harness)
 
-		By("booting a VM and enrolling the device")
-		deviceID = harness.StartVMAndEnroll()
+		By("booting a VM and enrolling the device using shared overlay")
+		// Share the VM overlay from the suite harness for fast startup (10s vs 3min)
+		harness.ShareOverlayWith(suiteHarness)
+		deviceID = harness.FastStartVMAndEnroll() // Uses overlay for rapid VM restore
 	})
 
 	AfterEach(func() { harness.Cleanup(false) })

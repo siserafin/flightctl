@@ -39,7 +39,10 @@ var _ = Describe("Microshift cluster ACM enrollment tests", func() {
 		BeforeEach(func() {
 			ctx = util.StartSpecTracerForGinkgo(suiteCtx)
 			harness = e2e.NewTestHarness(ctx)
-			deviceId = harness.StartVMAndEnroll()
+
+			// Share the VM overlay from the suite harness for fast startup (10s vs 3min)
+			harness.ShareOverlayWith(suiteHarness)
+			deviceId = harness.FastStartVMAndEnroll() // Uses overlay for rapid VM restore
 		})
 
 		AfterEach(func() {

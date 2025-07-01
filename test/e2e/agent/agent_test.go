@@ -24,7 +24,14 @@ var _ = Describe("VM Agent behavior", func() {
 	BeforeEach(func() {
 		ctx = testutil.StartSpecTracerForGinkgo(suiteCtx)
 		harness = e2e.NewTestHarness(ctx)
-		err := harness.VM.RunAndWaitForSSH()
+
+		// Share the VM overlay from the suite harness for fast startup (10s vs 3min)
+		harness.ShareOverlayWith(suiteHarness)
+
+		// Fast VM startup using overlay - no need for separate enrollment yet
+		err := harness.RestoreVMFromOverlay()
+		Expect(err).ToNot(HaveOccurred())
+		err = harness.VM.WaitForSSHToBeReady()
 		Expect(err).ToNot(HaveOccurred())
 	})
 

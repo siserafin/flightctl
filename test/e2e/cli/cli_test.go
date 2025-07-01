@@ -93,7 +93,10 @@ var _ = Describe("cli operation", func() {
 
 	Context("Plural names for resources and autocompletion in the cli work well", func() {
 		It("Should let you list resources by plural names", Label("80453", "sanity"), func() {
-			deviceID := harness.StartVMAndEnroll()
+			// For CLI tests, we'll create a simple VM harness per test since CLI tests are mixed
+			vmHarness := e2e.NewTestHarness(ctx)
+			defer vmHarness.Cleanup(false)
+			deviceID := vmHarness.StartVMAndEnroll()
 			By("Should let you list devices")
 			out, err := harness.CLI("get", "devices")
 			Expect(err).ToNot(HaveOccurred())

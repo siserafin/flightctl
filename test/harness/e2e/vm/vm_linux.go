@@ -336,13 +336,5 @@ func (v *VMInLibvirt) RunAndWaitForSSH() error {
 	if err != nil {
 		return fmt.Errorf("failed to run VM: %w", err)
 	}
-
-	err = v.WaitForSSHToBeReady()
-	if err != nil {
-		fmt.Println("============ Console output ============")
-		fmt.Println(v.GetConsoleOutput())
-		fmt.Println("========================================")
-		return fmt.Errorf("waiting for SSH: %w", err)
-	}
-	return nil
+	return v.WaitForSSHToBeReady()
 }
