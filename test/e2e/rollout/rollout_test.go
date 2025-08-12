@@ -575,26 +575,31 @@ func (tc *TestContext) updateAppVersion(version string) error {
 }
 
 func (tc *TestContext) verifyAllDevicesUpdated(expectedCount int) error {
-	updatedDevices, err := tc.harness.GetUpdatedDevices(fleetName)
-	if err != nil {
-		return err
-	}
+	// Add retries for 5 minutes with Eventually pattern
+	Eventually(func() error {
+		updatedDevices, err := tc.harness.GetUpdatedDevices(fleetName)
+		if err != nil {
+			return err
+		}
 
-	if len(updatedDevices) != expectedCount {
-		return fmt.Errorf("expected %d devices to be updated, but got %d", expectedCount, len(updatedDevices))
-	}
+		if len(updatedDevices) != expectedCount {
+			return fmt.Errorf("expected %d devices to be updated, but got %d", expectedCount, len(updatedDevices))
+		}
 
-	for _, device := range updatedDevices {
-		if len(device.Status.Applications) > 0 {
-			app := device.Status.Applications[0]
-			if app.Status != api.ApplicationStatusRunning {
-				return fmt.Errorf("application %s is not running", app.Name)
-			}
-			if tc.applicationSpec.Name != nil && app.Name != *tc.applicationSpec.Name {
-				return fmt.Errorf("device %s application name is %q, expected %q", *device.Metadata.Name, app.Name, *tc.applicationSpec.Name)
+		for _, device := range updatedDevices {
+			if len(device.Status.Applications) > 0 {
+				app := device.Status.Applications[0]
+				if app.Status != api.ApplicationStatusRunning {
+					return fmt.Errorf("application %s is not running", app.Name)
+				}
+				if tc.applicationSpec.Name != nil && app.Name != *tc.applicationSpec.Name {
+					return fmt.Errorf("device %s application name is %q, expected %q", *device.Metadata.Name, app.Name, *tc.applicationSpec.Name)
+				}
 			}
 		}
-	}
+
+		return nil
+	}, "5m", "250ms").Should(Succeed())
 
 	return nil
 }
