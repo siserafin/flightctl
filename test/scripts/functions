@@ -206,25 +206,48 @@ function is_acm_installed() {
 
 # Function to get the ocp nodes network name
 function get_ocp_nodes_network() {
-  ip=$(/usr/local/bin/oc get node -owide --no-headers | tail -n 1 | awk '{print $6}') || return 1
-  if [[ -z "$ip" ]]; then
-    echo "No nodes found" >&2
-    return 1
-  fi
-   ip=${ip%.*}
-  if [[ -z "$ip" ]]; then
-    echo "Invalid IP format" >&2
+  local kubeconfig="$1"
+  local ip net
+
+  # Validate argument
+  if [[ -z "$kubeconfig" ]]; then
+    echo "Error: kubeconfig path not provided." >&2
+    echo "Usage: get_ocp_nodes_network <path_to_kubeconfig>" >&2
     return 1
   fi
 
-  # get the network name from the ip
+  # Check that the kubeconfig file exists
+  if [[ ! -f "$kubeconfig" ]]; then
+    echo "Error: kubeconfig file '$kubeconfig' not found." >&2
+    return 1
+  fi
+
+  # Extract the node IP
+  ip=$(/usr/local/bin/oc get node --kubeconfig="$kubeconfig" -o wide --no-headers | tail -n 1 | awk '{print $6}') || return 1
+  if [[ -z "$ip" ]]; then
+    echo "Error: no node IPs found from the cluster." >&2
+    return 1
+  fi
+
+  # Trim last octet to get network prefix
+  ip="${ip%.*}"
+  if [[ -z "$ip" ]]; then
+    echo "Error: invalid IP format." >&2
+    return 1
+  fi
+
+  # Identify matching libvirt network
   for net in $(sudo virsh net-list --name); do
-    if [[ "$(sudo virsh net-dumpxml $net |grep $ip)" != "" ]];
-      then echo $net;
-      break;
-    fi;
+    if sudo virsh net-dumpxml "$net" | grep -q "$ip"; then
+      echo "$net"
+      return 0
+    fi
   done
+
+  echo "Error: no matching libvirt network found for IP prefix '$ip'." >&2
+  return 1
 }
+
 
 # download_brew_rpms downloads RPMs from brew registry to a target directory
 # Usage: download_brew_rpms <target_dir> [required_patterns...]
