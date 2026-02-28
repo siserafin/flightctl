@@ -111,9 +111,33 @@ var _ = Describe("Rollout Policies", Label("rollout"), func() {
 			waitDuration, _ := time.ParseDuration(DEVICEWAITTIME)
 			time.Sleep(waitDuration)
 
-			// Update fleet with template
-			err = tc.harness.CreateOrUpdateTestFleet(fleetName, createFleetSpec(bsq1, lo.ToPtr(api.Percentage("50%")), deviceSpec))
+			// Update fleet with rollout policy and template
+			GinkgoWriter.Printf("📝 Updating fleet '%s' with rollout policy and device template\n", fleetName)
+			fleetSpec := createFleetSpec(bsq1, lo.ToPtr(api.Percentage("50%")), deviceSpec)
+			err = tc.harness.CreateOrUpdateTestFleet(fleetName, fleetSpec)
 			Expect(err).ToNot(HaveOccurred())
+
+			// Verify the fleet was actually updated with rollout policy
+			response, err := tc.harness.Client.GetFleetWithResponse(ctx, fleetName, nil)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(response.JSON200).ToNot(BeNil(), "Fleet response should not be nil")
+			Expect(response.JSON200.Spec.RolloutPolicy).ToNot(BeNil(), "Fleet should have rollout policy after update")
+			Expect(response.JSON200.Spec.RolloutPolicy.DeviceSelection).ToNot(BeNil(), "Fleet should have device selection after update")
+			GinkgoWriter.Printf("✅ Fleet '%s' verified with rollout policy and device selection\n", fleetName)
+
+			// Wait for rollout controller to initialize (batch number annotation should appear)
+			GinkgoWriter.Printf("⏳ Waiting for rollout controller to initialize batch annotations...\n")
+			Eventually(func() error {
+				batchNum, err := tc.getCurrentBatchNumber(ctx, fleetName)
+				if err != nil {
+					return err
+				}
+				if batchNum < 0 {
+					return fmt.Errorf("batch number still not initialized (got %d)", batchNum)
+				}
+				GinkgoWriter.Printf("✅ Rollout initialized! Current batch number: %d\n", batchNum)
+				return nil
+			}, "2m", "5s").Should(Succeed(), "Rollout controller should initialize batch annotations within 2 minutes")
 
 			By("Verifying the first batch selects 1 device")
 
