@@ -89,9 +89,23 @@ func (p *VMPool) GetFreshVMForWorker(workerID int) (vm.TestVMInterface, error) {
 	p.mutex.RLock()
 	if vm, exists := p.freshVMs[workerID]; exists {
 		p.mutex.RUnlock()
-		return vm, nil
+		// CRITICAL: Fresh VMs must be destroyed and recreated each time to ensure clean state
+		// Reusing a fresh VM from a previous test run will have stale agent enrollment, certs, etc.
+		fmt.Printf("⚠️  [VMPool] Worker %d: Found existing fresh VM in pool from previous run - destroying and recreating for clean state\n", workerID)
+
+		// Remove from pool and destroy the stale VM
+		p.mutex.Lock()
+		delete(p.freshVMs, workerID)
+		p.mutex.Unlock()
+
+		// Destroy the stale VM
+		if err := vm.ForceDelete(); err != nil {
+			fmt.Printf("⚠️  [VMPool] Worker %d: Failed to destroy stale fresh VM: %v (continuing anyway)\n", workerID, err)
+		}
+		// Will create a new fresh VM below
+	} else {
+		p.mutex.RUnlock()
 	}
-	p.mutex.RUnlock()
 
 	// Create new fresh VM for this worker (outside of lock)
 	newVM, err := p.createFreshVMForWorker(workerID)
@@ -269,6 +283,14 @@ func (p *VMPool) createFreshVMForWorker(workerID int) (vm.TestVMInterface, error
 	}
 
 	workerDiskPath := filepath.Join(workerDir, fmt.Sprintf("fresh-%d-disk.qcow2", workerID))
+
+	// Delete old disk if it exists from previous run (ensures clean state)
+	if _, err := os.Stat(workerDiskPath); err == nil {
+		fmt.Printf("🧹 [VMPool] Worker %d: Removing old fresh disk at %s\n", workerID, workerDiskPath)
+		if err := os.Remove(workerDiskPath); err != nil {
+			return nil, fmt.Errorf("failed to remove old fresh disk for worker %d: %w", workerID, err)
+		}
+	}
 
 	// Create a qcow2 overlay image with the original base disk as backing file
 	// (Regular VMs use an intermediate shared copy; fresh VMs use the original directly)

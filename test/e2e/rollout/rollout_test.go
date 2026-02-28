@@ -468,7 +468,13 @@ var _ = Describe("Rollout Policies", Label("rollout"), func() {
 				// Get current batch number
 				batchNumber, err := tc.getCurrentBatchNumber(ctx, fleetName)
 				if err != nil {
+					// Return error so Eventually will keep retrying
 					return err
+				}
+
+				// If batch number is -1, rollout hasn't started yet - keep waiting
+				if batchNumber < 0 {
+					return fmt.Errorf("rollout not started yet (batch number is %d)", batchNumber)
 				}
 
 				// Only check when we're exactly at batch 0
@@ -606,18 +612,27 @@ func setupTestContext(ctx context.Context) *TestContext {
 
 func (tc *TestContext) setupFleetAndDevices(context context.Context, numDevices int, labelsList []map[string]string) error {
 
+	// Delete any existing fleet to ensure clean state (especially when running with other test suites)
+	GinkgoWriter.Printf("🧹 [setupFleetAndDevices] Deleting any existing fleet '%s' to ensure clean state\n", fleetName)
+	_ = tc.harness.DeleteFleet(fleetName) // Ignore error if fleet doesn't exist
+
+	// Wait a moment for deletion to complete
+	time.Sleep(2 * time.Second)
+
+	// Create fresh fleet with minimal spec
+	GinkgoWriter.Printf("📝 [setupFleetAndDevices] Creating fresh fleet '%s'\n", fleetName)
 	err := tc.harness.CreateOrUpdateTestFleet(fleetName, testFleetSelector, api.DeviceSpec{})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create fleet: %w", err)
 	}
 	// Create multiple devices using the resources package
 	tc.deviceIDs = make([]string, numDevices)
 	tc.harnesses = make([]*e2e.Harness, numDevices)
 
 	// Use goroutines to set up devices concurrently
-	// Note: Each device VM uses ~1GB RAM, so be mindful of system resources
-	GinkgoWriter.Printf("Creating %d device VMs in parallel (each needs ~1GB RAM)...\n", numDevices)
-	GinkgoWriter.Printf("Expected total memory usage: ~%dGB (VMs) + ~2GB (main worker) = ~%dGB\n", numDevices, numDevices+2)
+	// Note: Each fresh device VM uses 2GB RAM (from vm_pool.go), so be mindful of system resources
+	GinkgoWriter.Printf("Creating %d fresh device VMs in parallel (each uses 2GB RAM)...\n", numDevices)
+	GinkgoWriter.Printf("Expected total memory usage: %dGB (device VMs) + 2GB (main worker) = %dGB\n", numDevices*2, numDevices*2+2)
 
 	var wg sync.WaitGroup
 	errChan := make(chan error, numDevices)
@@ -630,9 +645,11 @@ func (tc *TestContext) setupFleetAndDevices(context context.Context, numDevices 
 			testID := tc.harness.GetTestIDFromContext()
 			GinkgoWriter.Printf("📦 [VM %d] Starting creation (Test ID: %s)\n", index+1, testID)
 
-			// Use fresh VMs from pool (no snapshots, overlay disks, 1GB RAM)
+			// Use fresh VMs from pool (no snapshots, overlay disks)
 			// This avoids snapshot revert issues while still using pool management
-			vmHarness, err := e2e.NewTestHarnessWithFreshVMFromPool(context, 1000+index)
+			// Worker ID offset: 1000 + index to avoid conflicts with main worker
+			workerID := 1000 + index
+			vmHarness, err := e2e.NewTestHarnessWithFreshVMFromPool(context, workerID)
 			if err != nil {
 				GinkgoWriter.Printf("❌ [VM %d] Failed to create harness: %v\n", index+1, err)
 				errChan <- fmt.Errorf("VM %d: %w", index+1, err)
@@ -739,26 +756,33 @@ func (tc *TestContext) verifyAllDevicesUpdated(expectedCount int) error {
 func (tc *TestContext) getCurrentBatchNumber(ctx context.Context, fleetName string) (int, error) {
 	response, err := tc.harness.Client.GetFleetWithResponse(ctx, fleetName, nil)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get fleet: %w", err)
+		return -1, fmt.Errorf("failed to get fleet: %w", err)
 	}
 	if response == nil || response.JSON200 == nil {
-		return 0, fmt.Errorf("fleet response is nil")
+		return -1, fmt.Errorf("fleet response is nil")
 	}
 
 	fleet := response.JSON200
 	annotations := fleet.Metadata.Annotations
 	if annotations == nil {
-		return 0, fmt.Errorf("fleet annotations are nil")
+		GinkgoWriter.Printf("⏳ [getCurrentBatchNumber] Fleet annotations are nil (rollout not started yet)\n")
+		return -1, fmt.Errorf("fleet annotations are nil - rollout not initialized yet")
 	}
 
 	batchNumberStr, ok := (*annotations)[api.FleetAnnotationBatchNumber]
 	if !ok {
-		return 0, fmt.Errorf("batch number annotation not found")
+		// List available annotations for debugging
+		availableKeys := make([]string, 0, len(*annotations))
+		for k := range *annotations {
+			availableKeys = append(availableKeys, k)
+		}
+		GinkgoWriter.Printf("⏳ [getCurrentBatchNumber] Batch number annotation not found (rollout not started yet) - available annotations: %v\n", availableKeys)
+		return -1, fmt.Errorf("batch number annotation not found - rollout not initialized yet")
 	}
 
 	batchNumber, err := strconv.Atoi(batchNumberStr)
 	if err != nil {
-		return 0, fmt.Errorf("failed to parse batch number: %w", err)
+		return -1, fmt.Errorf("failed to parse batch number %q: %w", batchNumberStr, err)
 	}
 
 	return batchNumber, nil
