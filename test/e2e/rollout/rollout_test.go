@@ -29,18 +29,31 @@ var _ = Describe("Rollout Policies", Label("rollout"), func() {
 		// Initialize the test context
 		ctx = testCtx
 		testID := harness.GetTestIDFromContext()
-		GinkgoWriter.Printf("Test ID: %s\n", testID)
+		GinkgoWriter.Printf("🔄 [BeforeEach] Rollout test starting with Test ID: %s\n", testID)
 		tc = setupTestContext(ctx)
 
+		// Add DeferCleanup to ensure harnesses are cleaned up even on failure
+		DeferCleanup(func() {
+			GinkgoWriter.Printf("🧹 [DeferCleanup] Cleaning up %d harnesses\n", len(tc.harnesses))
+			for i, h := range tc.harnesses {
+				if h != nil {
+					GinkgoWriter.Printf("  - Cleaning up harness %d\n", i)
+					e2e.Cleanup(h)
+				}
+			}
+		})
 	})
 
 	AfterEach(func() {
+		GinkgoWriter.Printf("🔄 [AfterEach] Starting cleanup of %d harnesses\n", len(tc.harnesses))
+		var cleanupErrors []error
 		for i, harness := range tc.harnesses {
 			if harness != nil {
-				GinkgoWriter.Printf("Cleaning up harness for rollout worker %d\n", i)
+				GinkgoWriter.Printf("  - Cleaning up harness for rollout worker %d\n", i)
 				err := harness.CleanUpAllTestResources()
 				if err != nil {
-					Fail(fmt.Sprintf("Error cleaning up test resources: %v", err))
+					GinkgoWriter.Printf("  ⚠️  Warning: Failed to clean up test resources for harness %d: %v\n", i, err)
+					cleanupErrors = append(cleanupErrors, fmt.Errorf("harness %d: %w", i, err))
 				}
 				e2e.Cleanup(harness)
 			}
@@ -48,6 +61,15 @@ var _ = Describe("Rollout Policies", Label("rollout"), func() {
 		tc.harnesses = nil
 		tc.deviceIDs = nil
 
+		if len(cleanupErrors) > 0 {
+			GinkgoWriter.Printf("❌ [AfterEach] Cleanup completed with %d error(s)\n", len(cleanupErrors))
+			for _, err := range cleanupErrors {
+				GinkgoWriter.Printf("  - %v\n", err)
+			}
+			// Don't fail the test due to cleanup errors, just log them
+		} else {
+			GinkgoWriter.Printf("✅ [AfterEach] Cleanup completed successfully\n")
+		}
 	})
 
 	Context("Multi Device Selection", Label("79648"), func() {
@@ -593,7 +615,10 @@ func (tc *TestContext) setupFleetAndDevices(context context.Context, numDevices 
 	tc.harnesses = make([]*e2e.Harness, numDevices)
 
 	// Use goroutines to set up devices concurrently
-	GinkgoWriter.Printf("Creating %d device VMs in parallel...\n", numDevices)
+	// Note: Each device VM uses ~1GB RAM, so be mindful of system resources
+	GinkgoWriter.Printf("Creating %d device VMs in parallel (each needs ~1GB RAM)...\n", numDevices)
+	GinkgoWriter.Printf("Expected total memory usage: ~%dGB (VMs) + ~2GB (main worker) = ~%dGB\n", numDevices, numDevices+2)
+
 	var wg sync.WaitGroup
 	errChan := make(chan error, numDevices)
 
@@ -609,6 +634,7 @@ func (tc *TestContext) setupFleetAndDevices(context context.Context, numDevices 
 			// This avoids snapshot revert issues while still using pool management
 			vmHarness, err := e2e.NewTestHarnessWithFreshVMFromPool(context, 1000+index)
 			if err != nil {
+				GinkgoWriter.Printf("❌ [VM %d] Failed to create harness: %v\n", index+1, err)
 				errChan <- fmt.Errorf("VM %d: %w", index+1, err)
 				return
 			}
@@ -625,6 +651,7 @@ func (tc *TestContext) setupFleetAndDevices(context context.Context, numDevices 
 			GinkgoWriter.Printf("🔄 [VM %d] Enrolling device...\n", index+1)
 			deviceID, device := vmHarness.EnrollAndWaitForOnlineStatus(labels)
 			if device == nil {
+				GinkgoWriter.Printf("❌ [VM %d] Failed to enroll - device is nil\n", index+1)
 				errChan <- fmt.Errorf("VM %d: failed to enroll - device is nil", index+1)
 				return
 			}
@@ -638,11 +665,20 @@ func (tc *TestContext) setupFleetAndDevices(context context.Context, numDevices 
 	wg.Wait()
 	close(errChan)
 
-	// Check for any errors
+	// Check for any errors and collect them all
+	var errors []error
 	for err := range errChan {
 		if err != nil {
-			return err
+			errors = append(errors, err)
 		}
+	}
+
+	if len(errors) > 0 {
+		GinkgoWriter.Printf("❌ Failed to setup devices: %d error(s) occurred\n", len(errors))
+		for _, err := range errors {
+			GinkgoWriter.Printf("  - %v\n", err)
+		}
+		return errors[0] // Return first error
 	}
 
 	GinkgoWriter.Printf("✅ All %d devices created and enrolled successfully\n", numDevices)

@@ -26,8 +26,13 @@ func TestRollout(t *testing.T) {
 var _ = BeforeSuite(func() {
 	// Setup harness without VM for rollout tests
 	// Rollout tests only need API access, device VMs are created separately with worker IDs 1000+
+	GinkgoWriter.Printf("🔄 [BeforeSuite] Rollout: Starting harness setup without VM\n")
 	_, _, err := e2e.SetupWorkerHarnessWithoutVM()
-	Expect(err).ToNot(HaveOccurred())
+	if err != nil {
+		GinkgoWriter.Printf("❌ [BeforeSuite] Rollout: Failed to setup harness: %v\n", err)
+		Expect(err).ToNot(HaveOccurred())
+	}
+	GinkgoWriter.Printf("✅ [BeforeSuite] Rollout: Harness setup completed successfully\n")
 })
 
 var _ = BeforeEach(func() {
