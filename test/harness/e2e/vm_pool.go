@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -192,6 +193,16 @@ func (p *VMPool) createVMForWorker(workerID int) (vm.TestVMInterface, error) {
 
 	fmt.Printf("✅ [VMPool] Worker %d: Overlay disk created successfully\n", workerID)
 
+	// Device VM disk size can be configured via E2E_VM_DISK_SIZE_GB environment variable
+	// Default: 10GB (sufficient for kind/local testing)
+	// OCP: Set to 15GB for more space in nested VMs (container images, logs, test artifacts)
+	diskSizeGB := 10 // Default for kind
+	if diskSizeEnv := os.Getenv("E2E_VM_DISK_SIZE_GB"); diskSizeEnv != "" {
+		if size, err := strconv.Atoi(diskSizeEnv); err == nil && size > 0 {
+			diskSizeGB = size
+		}
+	}
+
 	// Create VM using the worker-specific overlay disk
 	newVM, err := vm.NewVM(vm.TestVM{
 		TestDir:       workerDir,
@@ -200,6 +211,7 @@ func (p *VMPool) createVMForWorker(workerID int) (vm.TestVMInterface, error) {
 		VMUser:        "user",
 		SSHPassword:   "user",
 		SSHPort:       p.config.SSHPortBase + workerID,
+		DiskSizeGB:    diskSizeGB,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create VM: %w", err)
@@ -316,6 +328,16 @@ func (p *VMPool) createFreshVMForWorker(workerID int) (vm.TestVMInterface, error
 	// Increased from 1024 to 2048 to prevent OOM during image pull/extraction
 	memoryMiB := 2048
 
+	// Fresh VM disk size can be configured via E2E_VM_DISK_SIZE_GB environment variable
+	// Default: 10GB (sufficient for kind/local testing)
+	// OCP: Set to 15GB for more space in nested VMs (container images, logs, test artifacts)
+	diskSizeGB := 10 // Default for kind
+	if diskSizeEnv := os.Getenv("E2E_VM_DISK_SIZE_GB"); diskSizeEnv != "" {
+		if size, err := strconv.Atoi(diskSizeEnv); err == nil && size > 0 {
+			diskSizeGB = size
+		}
+	}
+
 	// Create VM using the fresh disk copy
 	newVM, err := vm.NewVM(vm.TestVM{
 		TestDir:       workerDir,
@@ -325,6 +347,7 @@ func (p *VMPool) createFreshVMForWorker(workerID int) (vm.TestVMInterface, error
 		SSHPassword:   "user",
 		SSHPort:       p.config.SSHPortBase + workerID,
 		MemoryMiB:     memoryMiB,
+		DiskSizeGB:    diskSizeGB,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create VM: %w", err)

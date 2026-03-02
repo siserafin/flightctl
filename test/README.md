@@ -325,9 +325,43 @@ using the RPMs downloaded from the specified brew URL.
 ```bash
 KUBECONFIG_PATH=/path/to/your/kubeconfig make deploy-e2e-ocp-test-vm
 ```
-The default image for the VM is 10G which,by default is increased by 30G to 40G.
-You can set the `VM_DISK_SIZE_INC` environment variable to change it so the VM
-will have a bigger disk.
+
+**VM Resource Configuration:**
+
+The test VM can be configured using the following environment variables:
+
+- `VM_RAM`: RAM in MB (default: 10240 = 10GB)
+- `VM_CPUS`: Number of CPUs (default: 8)
+- `VM_DISK_SIZE_INC`: Disk size increment in GB (default: 30, making total disk 40GB)
+
+**Examples:**
+
+Default configuration (10GB RAM, 8 CPUs, 40GB disk):
+```bash
+KUBECONFIG_PATH=/path/to/your/kubeconfig make deploy-e2e-ocp-test-vm
+```
+
+For rollout tests (recommended: 16GB RAM, 12 CPUs, 50GB disk):
+```bash
+VM_RAM=16384 VM_CPUS=12 VM_DISK_SIZE_INC=50 make deploy-e2e-ocp-test-vm
+```
+
+Custom configuration:
+```bash
+VM_RAM=20480 VM_CPUS=16 VM_DISK_SIZE_INC=100 make deploy-e2e-ocp-test-vm
+```
+
+**Device VM Configuration:**
+
+Device VMs (the VMs created by e2e tests to simulate edge devices) can be configured with:
+- `E2E_VM_DISK_SIZE_GB`: Disk size in GB for each device VM (default: 10GB for kind, 15GB for OCP)
+
+Example:
+```bash
+E2E_VM_DISK_SIZE_GB=20 make e2e-test
+```
+
+**Note:** Rollout e2e tests require more resources than other tests because they create multiple device VMs (typically 4) within the test-vm. If you see devices marked as "disconnected (last seen more than 5 minutes ago)" during rollout tests, this is likely due to OOM (Out-Of-Memory) issues. Increase `VM_RAM` to at least 16GB for rollout tests.
 
 * Ssh into the vm.
 ```bash
@@ -385,11 +419,26 @@ make deploy-quadlets-vm
 ```
 
 **Optional configuration:**
-- Set custom disk size increment (default is 30G):
+
+**VM Resources:**
+You can customize the VM resources using these environment variables:
+- `VM_RAM`: RAM in MB (default: 10240 = 10GB)
+- `VM_CPUS`: Number of CPUs (default: 8)
+- `VM_DISK_SIZE_INC`: Disk size increment in GB (default: 30)
+
+Examples:
 ```bash
+# Custom disk size
 USER=redhat-user REDHAT_USER=redhat-user@redhat.com REDHAT_PASSWORD='your-password' VM_DISK_SIZE_INC=50 make deploy-quadlets-vm
+
+# Custom RAM and CPUs
+USER=redhat-user REDHAT_USER=redhat-user@redhat.com REDHAT_PASSWORD='your-password' VM_RAM=16384 VM_CPUS=12 make deploy-quadlets-vm
+
+# All custom resources
+USER=redhat-user REDHAT_USER=redhat-user@redhat.com REDHAT_PASSWORD='your-password' VM_RAM=16384 VM_CPUS=12 VM_DISK_SIZE_INC=50 make deploy-quadlets-vm
 ```
 
+**Installation Methods:**
 - Build and install from a specific git tag/version (builds inside VM):
 ```bash
 GIT_VERSION="v1.0.0" USER=redhat-user REDHAT_USER=redhat-user@redhat.com REDHAT_PASSWORD='your-password' make deploy-quadlets-vm

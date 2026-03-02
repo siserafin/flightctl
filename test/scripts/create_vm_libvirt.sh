@@ -8,13 +8,15 @@ export KUBECONFIG=${KUBECONFIG_PATH}
 
 # Variables
 VM_NAME="test-vm"
-VM_RAM=10240                # RAM in MB necessary to run the flightctl e2e
-VM_CPUS=8                  # Number of CPUs
+VM_RAM=${VM_RAM:-10240}     # RAM in MB - default 10GB, override with VM_RAM env var
+VM_CPUS=${VM_CPUS:-8}       # Number of CPUs - default 8, override with VM_CPUS env var
 VM_DISK_SIZE_INC=${VM_DISK_SIZE_INC:-30} # Disk size increment
 NETWORK_NAME="$(get_ocp_nodes_network)"   # Network name
 NETWORK_NAME=${NETWORK_NAME:-baremetal-0}
 DEFAULT_NETWORK_NAME="default"
 echo "ocp_network name is: ${NETWORK_NAME}"
+echo "VM RAM: ${VM_RAM}MB ($(($VM_RAM / 1024))GB)"
+echo "VM CPUs: ${VM_CPUS}"
 echo "Disk size increment: ${VM_DISK_SIZE_INC}G"
 ISO_URL="https://cloud.centos.org/centos/9-stream/x86_64/images/CentOS-Stream-GenericCloud-x86_64-9-latest.x86_64.qcow2"
 DISK_PATH="/var/lib/libvirt/images/${VM_NAME}.qcow2"

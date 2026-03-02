@@ -118,10 +118,10 @@ deploy-e2e-extras: bin/.ssh/id_rsa.pub bin/e2e-certs/ca.pem
 	test/scripts/deploy_e2e_extras_with_helm.sh
 
 deploy-e2e-ocp-test-vm:
-	sudo --preserve-env=VM_DISK_SIZE_INC test/scripts/create_vm_libvirt.sh ${KUBECONFIG_PATH}
+	sudo --preserve-env=VM_DISK_SIZE_INC,VM_RAM,VM_CPUS test/scripts/create_vm_libvirt.sh ${KUBECONFIG_PATH}
 
 deploy-quadlets-vm:
-	sudo --preserve-env=VM_DISK_SIZE_INC --preserve-env=USER --preserve-env=REDHAT_USER --preserve-env=REDHAT_PASSWORD --preserve-env=GIT_VERSION --preserve-env=BREW_BUILD_URL test/scripts/deploy_quadlets_rhel.sh
+	sudo --preserve-env=VM_DISK_SIZE_INC,VM_RAM,VM_CPUS --preserve-env=USER --preserve-env=REDHAT_USER --preserve-env=REDHAT_PASSWORD --preserve-env=GIT_VERSION --preserve-env=BREW_BUILD_URL test/scripts/deploy_quadlets_rhel.sh
 
 clean-quadlets-vm:
 	@echo "Cleaning up quadlets-vm..."
@@ -159,7 +159,7 @@ e2e-agent-images: $(E2E_AGENT_IMAGES_SENTINEL)
 	@echo "E2E agent images already built and up to date"
 
 in-cluster-e2e-test: prepare-e2e-test
-	$(MAKE) _e2e_test
+	E2E_VM_DISK_SIZE_GB=15 $(MAKE) _e2e_test
 
 e2e-test: RPM_MOCK_ROOT=centos-stream+epel-next-9-x86_64
 e2e-test: deploy prepare-e2e-qcow-config
