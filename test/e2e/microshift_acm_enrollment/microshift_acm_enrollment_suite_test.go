@@ -19,8 +19,12 @@ func TestMicroshift(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
+	// Clean up environment before suite starts (VMs, temp dirs, cluster resources)
+	err := e2e.RunE2ECleanupAndStartup()
+	Expect(err).ToNot(HaveOccurred())
+
 	// Setup VM and harness for this worker
-	_, _, err := e2e.SetupWorkerHarness()
+	_, _, err = e2e.SetupWorkerHarness()
 	Expect(err).ToNot(HaveOccurred())
 })
 

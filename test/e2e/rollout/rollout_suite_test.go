@@ -27,15 +27,19 @@ func TestRollout(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	// Clean up ALL leftover e2e VMs and temp directories from previous test runs
-	// This ensures a completely clean slate before rollout tests start
-	GinkgoWriter.Printf("🔄 [BeforeSuite] Rollout: Running global e2e cleanup from previous runs\n")
-	cleanupFreshVMs()
+	// Clean up environment before suite starts (VMs, temp dirs, cluster resources)
+	// This is now handled by the shared helper function instead of local cleanupFreshVMs()
+	GinkgoWriter.Printf("🔄 [BeforeSuite] Rollout: Running global e2e cleanup and startup\n")
+	err := e2e.RunE2ECleanupAndStartup()
+	if err != nil {
+		GinkgoWriter.Printf("❌ [BeforeSuite] Rollout: Failed to run cleanup/startup: %v\n", err)
+		Expect(err).ToNot(HaveOccurred())
+	}
 
 	// Setup harness without VM for rollout tests
 	// Rollout tests only need API access, device VMs are created separately with worker IDs 1000+
 	GinkgoWriter.Printf("🔄 [BeforeSuite] Rollout: Starting harness setup without VM\n")
-	_, _, err := e2e.SetupWorkerHarnessWithoutVM()
+	_, _, err = e2e.SetupWorkerHarnessWithoutVM()
 	if err != nil {
 		GinkgoWriter.Printf("❌ [BeforeSuite] Rollout: Failed to setup harness: %v\n", err)
 		Expect(err).ToNot(HaveOccurred())
